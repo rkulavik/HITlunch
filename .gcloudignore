@@ -1,0 +1,7 @@
+# Exclude local node_modules
+node_modules/
+.git/
+dist/
+database.json
+test-db-logic.js
+*.log
