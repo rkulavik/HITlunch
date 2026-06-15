@@ -326,6 +326,74 @@ export async function resetDatabaseState(names) {
   return { success: true };
 }
 
+/**
+ * Update multiple user scores transactionally.
+ * Enforces that the sum of adjustments must be exactly 0 (within rounding).
+ * adjustments: Array of { id: string, adjustment: number }
+ */
+export async function updateMultipleScores(adjustments) {
+  if (!adjustments || !Array.isArray(adjustments) || adjustments.length === 0) {
+    throw new Error('No adjustments provided');
+  }
+
+  // Calculate sum of adjustments
+  const sum = adjustments.reduce((acc, curr) => acc + curr.adjustment, 0);
+  if (Math.abs(sum) > 0.001) {
+    throw new Error(`Invalid adjustments: Net sum of changes must be 0. Current net sum: ${sum.toFixed(2)}`);
+  }
+
+  if (dbType === 'firestore') {
+    const results = await firestoreDb.runTransaction(async (transaction) => {
+      const userRefs = adjustments.map(adj => firestoreDb.collection('people').doc(adj.id));
+      const userDocs = await Promise.all(userRefs.map(ref => transaction.get(ref)));
+
+      // Verify all users exist
+      userDocs.forEach((doc, idx) => {
+        if (!doc.exists) {
+          throw new Error(`User profile with ID ${adjustments[idx].id} not found`);
+        }
+      });
+
+      const updatedUsers = [];
+
+      // Apply updates in transaction
+      adjustments.forEach((adj, idx) => {
+        const doc = userDocs[idx];
+        const currentScore = doc.data().score || 0;
+        const newScore = parseFloat((currentScore + adj.adjustment).toFixed(2));
+        transaction.update(doc.ref, { score: newScore });
+        updatedUsers.push({ id: doc.id, ...doc.data(), score: newScore });
+      });
+
+      return updatedUsers;
+    });
+    return results;
+  } else {
+    // Local JSON
+    const data = readLocalDb();
+    const updatedUsers = [];
+
+    // Verify all users exist and prepare updates
+    for (const adj of adjustments) {
+      const person = data.people.find(p => p.id === adj.id);
+      if (!person) {
+        throw new Error(`User profile with ID ${adj.id} not found`);
+      }
+    }
+
+    // Apply adjustments
+    for (const adj of adjustments) {
+      const person = data.people.find(p => p.id === adj.id);
+      person.score = parseFloat((person.score + adj.adjustment).toFixed(2));
+      updatedUsers.push(person);
+    }
+
+    writeLocalDb(data);
+    return updatedUsers;
+  }
+}
+
+
 // --- LUNCHES API & ALGORITHM ---
 
 export async function getLunches() {

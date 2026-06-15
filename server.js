@@ -14,7 +14,8 @@ import {
   getSettings,
   updateSettings,
   getDbType,
-  resetDatabaseState
+  resetDatabaseState,
+  updateMultipleScores
 } from './db.js';
 
 const app = express();
@@ -89,6 +90,32 @@ async function startServer() {
       res.json({ success: true, user });
     } catch (error) {
       res.status(401).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/people/adjust-scores', async (req, res) => {
+    try {
+      const { adjustments } = req.body;
+      if (!adjustments || !Array.isArray(adjustments) || adjustments.length === 0) {
+        return res.status(400).json({ error: 'Array of adjustments is required' });
+      }
+
+      // Validate zero-sum on server side
+      const sum = adjustments.reduce((acc, curr) => acc + (parseFloat(curr.adjustment) || 0), 0);
+      if (Math.abs(sum) > 0.001) {
+        return res.status(400).json({ error: `Net sum of adjustments must be exactly 0.00. Current net sum: ${sum.toFixed(2)}` });
+      }
+
+      // Convert adjustments values to numbers
+      const parsedAdjustments = adjustments.map(adj => ({
+        id: adj.id,
+        adjustment: parseFloat(adj.adjustment)
+      }));
+
+      const updatedPeople = await updateMultipleScores(parsedAdjustments);
+      res.json({ success: true, people: updatedPeople });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   });
 

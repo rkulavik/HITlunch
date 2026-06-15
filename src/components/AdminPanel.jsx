@@ -10,6 +10,63 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
   const [isAdding, setIsAdding] = useState(false);
   const [resetNamesList, setResetNamesList] = useState('Richard, Sarah, David, Emma');
   const [isResetting, setIsResetting] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjustments, setAdjustments] = useState({});
+  const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
+
+  const netChange = parseFloat(Object.values(adjustments).reduce((acc, val) => acc + val, 0).toFixed(2));
+  const hasChanges = Object.values(adjustments).some(val => val !== 0);
+
+  const handleAdjustValue = (personId, amount) => {
+    setAdjustments(prev => {
+      const val = prev[personId] || 0;
+      return {
+        ...prev,
+        [personId]: parseFloat((val + amount).toFixed(2))
+      };
+    });
+  };
+
+  const handleAdjustInput = (personId, value) => {
+    const parsed = parseFloat(value);
+    setAdjustments(prev => ({
+      ...prev,
+      [personId]: isNaN(parsed) ? 0 : parsed
+    }));
+  };
+
+  const handleSaveAdjustments = async () => {
+    const payload = Object.entries(adjustments)
+      .map(([id, val]) => ({ id, adjustment: val }))
+      .filter(adj => adj.adjustment !== 0);
+      
+    if (payload.length === 0) return;
+    
+    setIsSavingAdjustments(true);
+    setMessage({ type: '', text: '' });
+    
+    try {
+      const res = await fetch('/api/people/adjust-scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adjustments: payload })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save adjustments');
+      }
+      
+      setMessage({ type: 'success', text: 'Balances adjusted successfully.' });
+      setIsAdjusting(false);
+      setAdjustments({});
+      onRefreshData();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSavingAdjustments(false);
+    }
+  };
 
   const handleResetDb = async (e) => {
     e.preventDefault();
@@ -319,7 +376,39 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
 
             {/* People List Table */}
             <div>
-              <h3 className="console-title">Registered User Profiles</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 className="console-title" style={{ margin: 0 }}>Registered User Profiles</h3>
+                {!isAdjusting ? (
+                  <button 
+                    type="button"
+                    className="btn"
+                    style={{ borderColor: 'var(--accent-indigo)', color: 'var(--accent-indigo)', fontWeight: '600' }}
+                    onClick={() => {
+                      setIsAdjusting(true);
+                      const initialAdjustments = {};
+                      people.forEach(p => {
+                        initialAdjustments[p.id] = 0;
+                      });
+                      setAdjustments(initialAdjustments);
+                    }}
+                  >
+                    ⚖️ Adjust Balances
+                  </button>
+                ) : (
+                  <button 
+                    type="button"
+                    className="btn"
+                    style={{ borderColor: 'var(--accent-rose)', color: 'var(--accent-rose)', fontWeight: '600' }}
+                    onClick={() => {
+                      setIsAdjusting(false);
+                      setAdjustments({});
+                    }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+
               <div className="history-table-wrapper">
                 <table className="history-table">
                   <thead>
@@ -327,78 +416,236 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
                       <th>Initials</th>
                       <th>Name</th>
                       <th>Balance</th>
-                      <th>Status</th>
-                      <th>Created</th>
-                      <th>Action</th>
+                      {isAdjusting && <th>Adjustment</th>}
+                      {isAdjusting && <th>Projected</th>}
+                      {!isAdjusting && <th>Status</th>}
+                      {!isAdjusting && <th>Created</th>}
+                      {!isAdjusting && <th>Action</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {people.map(person => (
-                      <tr key={person.id} style={{ opacity: person.isActive ? 1 : 0.45 }}>
-                        <td>
-                          <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.75rem', margin: 0 }}>
-                            {getInitials(person.name)}
-                          </div>
-                        </td>
-                        <td style={{ fontWeight: '600' }}>{person.name}</td>
-                        <td className="mono-val">
-                          <span className={`score-badge ${
-                            person.score > 0 ? 'score-positive' : person.score < 0 ? 'score-negative' : 'score-zero'
-                          }`}>
-                            {person.score > 0 ? `+${person.score.toFixed(2)}` : person.score.toFixed(2)}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <label className="switch">
-                              <input 
-                                type="checkbox" 
-                                checked={person.isActive} 
-                                onChange={() => handleToggleActive(person.id, person.isActive)}
-                              />
-                              <span className="slider"></span>
-                            </label>
-                            <span style={{ fontSize: '0.75rem', fontWeight: '500', color: 'var(--text-secondary)' }}>
-                              {person.isActive ? 'Active' : 'Disabled'}
+                    {people.map(person => {
+                      const currentAdj = adjustments[person.id] || 0;
+                      const projectedScore = parseFloat((person.score + currentAdj).toFixed(2));
+                      
+                      return (
+                        <tr key={person.id} style={{ opacity: person.isActive ? 1 : 0.45 }}>
+                          <td>
+                            <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.75rem', margin: 0 }}>
+                              {getInitials(person.name)}
+                            </div>
+                          </td>
+                          <td style={{ fontWeight: '600' }}>{person.name}</td>
+                          <td className="mono-val">
+                            <span className={`score-badge ${
+                              person.score > 0 ? 'score-positive' : person.score < 0 ? 'score-negative' : 'score-zero'
+                            }`}>
+                              {person.score > 0 ? `+${person.score.toFixed(2)}` : person.score.toFixed(2)}
                             </span>
-                          </div>
-                        </td>
-                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {new Date(person.createdAt || new Date()).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button
-                              className="btn"
-                              style={{ 
-                                padding: '0.25rem 0.5rem', 
-                                fontSize: '0.7rem', 
-                                color: 'var(--accent-cyan)', 
-                                borderColor: 'var(--border-card)'
-                              }}
-                              onClick={() => handleUpdatePassword(person.id, person.name)}
-                            >
-                              Password
-                            </button>
-                            <button
-                              className="btn"
-                              style={{ 
-                                padding: '0.25rem 0.5rem', 
-                                fontSize: '0.7rem', 
-                                color: 'var(--accent-rose)', 
-                                borderColor: 'var(--border-card)'
-                              }}
-                              onClick={() => handleDeletePerson(person.id, person.name, person.score)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          
+                          {isAdjusting && (
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  style={{ 
+                                    padding: '0.2rem 0.45rem', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '900', 
+                                    minWidth: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid var(--border-card)',
+                                    background: 'rgba(244, 63, 94, 0.04)',
+                                    color: 'var(--accent-rose)',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => handleAdjustValue(person.id, -1.0)}
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="form-input"
+                                  style={{ 
+                                    width: '80px', 
+                                    padding: '0.2rem 0.4rem', 
+                                    textAlign: 'center', 
+                                    fontSize: '0.8rem',
+                                    margin: 0,
+                                    background: 'rgba(255,255,255,0.01)',
+                                    border: '1px solid var(--border-card)',
+                                    color: currentAdj > 0 ? 'var(--accent-emerald)' : currentAdj < 0 ? 'var(--accent-rose)' : 'var(--text-secondary)'
+                                  }}
+                                  value={currentAdj}
+                                  onChange={(e) => handleAdjustInput(person.id, e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  style={{ 
+                                    padding: '0.2rem 0.45rem', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '900', 
+                                    minWidth: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid var(--border-card)',
+                                    background: 'rgba(16, 185, 129, 0.04)',
+                                    color: 'var(--accent-emerald)',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => handleAdjustValue(person.id, 1.0)}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+                          )}
+
+                          {isAdjusting && (
+                            <td className="mono-val">
+                              <span className={`score-badge ${
+                                projectedScore > 0 ? 'score-positive' : projectedScore < 0 ? 'score-negative' : 'score-zero'
+                              }`} style={{ opacity: currentAdj !== 0 ? 1 : 0.65 }}>
+                                {projectedScore > 0 ? `+${projectedScore.toFixed(2)}` : projectedScore.toFixed(2)}
+                              </span>
+                            </td>
+                          )}
+                          
+                          {!isAdjusting && (
+                            <>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <label className="switch">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={person.isActive} 
+                                      onChange={() => handleToggleActive(person.id, person.isActive)}
+                                    />
+                                    <span className="slider"></span>
+                                  </label>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '500', color: 'var(--text-secondary)' }}>
+                                    {person.isActive ? 'Active' : 'Disabled'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {new Date(person.createdAt || new Date()).toLocaleDateString()}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                  <button
+                                    className="btn"
+                                    style={{ 
+                                      padding: '0.25rem 0.5rem', 
+                                      fontSize: '0.7rem', 
+                                      color: 'var(--accent-cyan)', 
+                                      borderColor: 'var(--border-card)'
+                                    }}
+                                    onClick={() => handleUpdatePassword(person.id, person.name)}
+                                  >
+                                    Password
+                                  </button>
+                                  <button
+                                    className="btn"
+                                    style={{ 
+                                      padding: '0.25rem 0.5rem', 
+                                      fontSize: '0.7rem', 
+                                      color: 'var(--accent-rose)', 
+                                      borderColor: 'var(--border-card)'
+                                    }}
+                                    onClick={() => handleDeletePerson(person.id, person.name, person.score)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {isAdjusting && (
+                <div style={{ 
+                  marginTop: '1.25rem', 
+                  padding: '1.25rem', 
+                  background: 'rgba(255, 255, 255, 0.01)', 
+                  border: '1px solid var(--border-card)', 
+                  borderRadius: '8px', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
+                      ZERO-SUM BALANCE VERIFICATION ENGINE
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Net Adjustment Change:</span>
+                      <span className="mono-val" style={{ 
+                        fontWeight: '700', 
+                        fontSize: '1rem',
+                        color: Math.abs(netChange) < 0.001 ? 'var(--accent-emerald)' : 'var(--accent-rose)'
+                      }}>
+                        {netChange > 0 ? `+${netChange.toFixed(2)}` : netChange.toFixed(2)}
+                      </span>
+                      {Math.abs(netChange) < 0.001 ? (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '700' }}>
+                          ✓ BALANCED
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-rose)', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.15)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '700' }}>
+                          ✗ UNBALANCED (MUST SUM TO 0.00)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ fontWeight: '600' }}
+                      onClick={() => {
+                        setIsAdjusting(false);
+                        setAdjustments({});
+                      }}
+                      disabled={isSavingAdjustments}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ 
+                        fontWeight: '700', 
+                        background: Math.abs(netChange) < 0.001 && hasChanges ? 'var(--accent-indigo)' : 'rgba(255,255,255,0.01)',
+                        borderColor: Math.abs(netChange) < 0.001 && hasChanges ? 'var(--accent-indigo)' : 'var(--border-card)',
+                        color: Math.abs(netChange) < 0.001 && hasChanges ? '#fff' : 'var(--text-muted)',
+                        cursor: Math.abs(netChange) < 0.001 && hasChanges ? 'pointer' : 'not-allowed'
+                      }}
+                      disabled={Math.abs(netChange) > 0.001 || !hasChanges || isSavingAdjustments}
+                      onClick={handleSaveAdjustments}
+                    >
+                      {isSavingAdjustments ? 'Saving...' : 'Save Adjustments'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
