@@ -1564,3 +1564,73 @@ input:checked + .slider:before {
   overflow: visible;
   filter: drop-shadow(2px 2px 0px #000);
 }
+
+/* Custom Neobrutalist Modal System */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.modal-container {
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--border-card);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-enter 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modal-enter {
+  0% { transform: scale(0.95) translateY(15px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: var(--border-width) solid var(--border-card);
+  background: var(--bg-secondary);
+}
+
+.modal-header.danger-header {
+  background: var(--accent-rose);
+  color: #ffffff;
+}
+
+.modal-header-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: var(--border-width) dashed var(--border-card);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: var(--bg-secondary);
+}
+

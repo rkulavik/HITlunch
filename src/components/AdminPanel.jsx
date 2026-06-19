@@ -13,6 +13,9 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [adjustments, setAdjustments] = useState({});
   const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null); 
+  const [promptModal, setPromptModal] = useState(null);
+  const [promptInput, setPromptInput] = useState('');
 
   const netChange = parseFloat(Object.values(adjustments).reduce((acc, val) => acc + val, 0).toFixed(2));
   const hasChanges = Object.values(adjustments).some(val => val !== 0);
@@ -68,22 +71,7 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
     }
   };
 
-  const handleResetDb = async (e) => {
-    e.preventDefault();
-    const names = resetNamesList
-      .split(',')
-      .map(n => n.trim())
-      .filter(n => n.length > 0);
-
-    if (names.length === 0) {
-      alert('You must provide at least one person name.');
-      return;
-    }
-
-    if (!confirm('🚨 CRITICAL WARNING 🚨\n\nThis will permanently DELETE all lunch transactions, reset all user profiles, and re-seed the system with only the listed users (all starting with a 0.00 balance).\n\nAre you absolutely sure you want to proceed?')) {
-      return;
-    }
-
+  const executeResetDb = async (names) => {
     setIsResetting(true);
     setMessage({ type: '', text: '' });
 
@@ -107,6 +95,34 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
     } finally {
       setIsResetting(false);
     }
+  };
+
+  const handleResetDb = async (e) => {
+    e.preventDefault();
+    const names = resetNamesList
+      .split(',')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+
+    if (names.length === 0) {
+      setConfirmModal({
+        title: 'Validation Error',
+        message: 'You must provide at least one person name.',
+        showOnlyOk: true
+      });
+      return;
+    }
+
+    setConfirmModal({
+      title: '🚨 CRITICAL WARNING 🚨',
+      message: 'This will permanently DELETE all lunch transactions, reset all user profiles, and re-seed the system with only the listed users (all starting with a 0.00 balance).\n\nAre you absolutely sure you want to proceed?',
+      confirmText: 'Yes, Reset Database',
+      isDanger: true,
+      onConfirm: () => {
+        setConfirmModal(null);
+        executeResetDb(names);
+      }
+    });
   };
 
   // Load history when tab is clicked
@@ -198,85 +214,107 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
   const handleDeletePerson = async (id, name, score) => {
     const activeOthers = people.filter(p => p.id !== id && p.isActive);
     
-    let alertMsg = `DELETE PROFILE\n------------------\n` +
-                   `User: ${name}\n` +
+    let alertMsg = `User: ${name}\n` +
                    `Balance: ${score.toFixed(2)}\n\n` +
                    `Warning: Deleting a profile is permanent. `;
     
     if (score !== 0) {
       if (activeOthers.length === 0) {
-        alertMsg += `Because there are no other active members, this non-zero balance cannot be redistributed. Please deactivate the user profile instead.`;
-        alert(alertMsg);
+        setConfirmModal({
+          title: 'Cannot Delete Profile',
+          message: `${alertMsg}Because there are no other active members, this non-zero balance cannot be redistributed. Please deactivate the user profile instead.`,
+          showOnlyOk: true
+        });
         return;
       } else {
-        alertMsg += `To maintain a zero-sum balance, this profile's score of ${score.toFixed(2)} will be redistributed evenly among the other ${activeOthers.length} active users (${activeOthers.map(o=>o.name).join(', ')}).\n\nDelete profile?`;
+        alertMsg += `To maintain a zero-sum balance, this profile's score of ${score.toFixed(2)} will be redistributed evenly among the other ${activeOthers.length} active users (${activeOthers.map(o=>o.name).join(', ')}).`;
       }
-    } else {
-      alertMsg += `Delete profile?`;
     }
 
-    if (!confirm(alertMsg)) return;
-
-    try {
-      const res = await fetch(`/api/people/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: `Deleted profile "${name}". Balances redistributed.` });
-        onRefreshData();
-      } else {
-        throw new Error(data.error || 'Failed to delete user profile.');
+    setConfirmModal({
+      title: 'Delete Diner Profile?',
+      message: alertMsg,
+      confirmText: 'Delete Seat',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          const res = await fetch(`/api/people/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (res.ok) {
+            setMessage({ type: 'success', text: `Deleted profile "${name}". Balances redistributed.` });
+            onRefreshData();
+          } else {
+            throw new Error(data.error || 'Failed to delete user profile.');
+          }
+        } catch (err) {
+          setMessage({ type: 'error', text: err.message });
+        }
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message });
-    }
+    });
   };
 
   const handleUpdatePassword = async (id, name) => {
-    const newPassword = prompt(`CHANGE PASSCODE\n------------------\nEnter new security passcode for ${name}:`);
-    if (newPassword === null) return;
-    if (newPassword.trim() === '') {
-      alert('Passcode cannot be empty.');
-      return;
-    }
-    
-    try {
-      const res = await fetch(`/api/people/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword.trim() })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: `Passcode updated successfully for ${name}.` });
-      } else {
-        throw new Error(data.error || 'Failed to update passcode.');
+    setPromptInput('password123');
+    setPromptModal({
+      title: `Change Passcode for ${name}`,
+      message: 'Enter new security passcode:',
+      onConfirm: async (newPassword) => {
+        if (!newPassword || newPassword.trim() === '') {
+          setConfirmModal({
+            title: 'Empty Passcode',
+            message: 'Passcode cannot be empty.',
+            showOnlyOk: true
+          });
+          return;
+        }
+        setPromptModal(null);
+        
+        try {
+          const res = await fetch(`/api/people/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPassword.trim() })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setMessage({ type: 'success', text: `Passcode updated successfully for ${name}.` });
+          } else {
+            throw new Error(data.error || 'Failed to update passcode.');
+          }
+        } catch (err) {
+          setMessage({ type: 'error', text: err.message });
+        }
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message });
-    }
+    });
   };
 
   // Revert transaction
   const handleDeleteLunch = async (lunchId) => {
-    if (!confirm('REVERT TRANSACTION\n------------------\nAre you sure you want to delete this lunch log? Payer credit and attendee debits will be reversed.')) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/lunches/${lunchId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Transaction reverted and balances updated.' });
-        fetchHistory();
-        onRefreshData();
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to revert transaction.');
+    setConfirmModal({
+      title: 'Revert Transaction?',
+      message: 'Are you sure you want to delete this lunch log? Payer credit and attendee debits will be reversed.',
+      confirmText: 'Revert Log',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          const res = await fetch(`/api/lunches/${lunchId}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            setMessage({ type: 'success', text: 'Transaction reverted and balances updated.' });
+            fetchHistory();
+            onRefreshData();
+          } else {
+            const data = await res.json();
+            throw new Error(data.error || 'Failed to revert transaction.');
+          }
+        } catch (err) {
+          setMessage({ type: 'error', text: err.message });
+        }
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message });
-    }
+    });
   };
 
   const getPersonName = (id) => {
@@ -833,6 +871,81 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
         )}
 
       </div>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal && (
+        <div className="modal-backdrop">
+          <div className="modal-container">
+            <div className={`modal-header ${confirmModal.isDanger ? 'danger-header' : ''}`}>
+              <h4 className="modal-header-title">{confirmModal.title}</h4>
+            </div>
+            <div className="modal-body">
+              {confirmModal.message}
+            </div>
+            <div className="modal-footer">
+              {!confirmModal.showOnlyOk && (
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => setConfirmModal(null)}
+                >
+                  Cancel
+                </button>
+              )}
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                style={confirmModal.isDanger ? { backgroundColor: 'var(--accent-rose)', borderColor: 'var(--border-card)', color: '#fff' } : {}}
+                onClick={confirmModal.onConfirm ? confirmModal.onConfirm : () => setConfirmModal(null)}
+              >
+                {confirmModal.confirmText || 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Prompt Modal */}
+      {promptModal && (
+        <div className="modal-backdrop">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h4 className="modal-header-title">{promptModal.title}</h4>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p>{promptModal.message}</p>
+              <input
+                type="text"
+                className="form-input"
+                value={promptInput}
+                onChange={(e) => setPromptInput(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptModal.onConfirm(promptInput);
+                  }
+                }}
+              />
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn" 
+                onClick={() => setPromptModal(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={() => promptModal.onConfirm(promptInput)}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
