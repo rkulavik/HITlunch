@@ -790,9 +790,19 @@ body {
 
 .form-input:focus {
   outline: none;
-  background: #ffffff;
+  background: var(--bg-card);
+  color: var(--text-primary);
   transform: translate(-1px, -1px);
   box-shadow: 3px 3px 0px var(--border-card);
+}
+
+/* Prevent autocomplete/autofill styling bugs (white-on-white text) */
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover, 
+.form-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-input) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 .gps-refresh-btn {
