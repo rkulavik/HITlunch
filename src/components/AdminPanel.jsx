@@ -298,19 +298,19 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
           className={`admin-nav-item ${activeTab === 'people' ? 'active' : ''}`}
           onClick={() => setActiveTab('people')}
         >
-          👤 Profiles
+          👥 Diner Profiles
         </button>
         <button 
           className={`admin-nav-item ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
-          📜 Transaction Log
+          📜 Bill Logs
         </button>
         <button 
           className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
-          ⚙️ Utilities & Storage
+          ⚙️ Kitchen Settings
         </button>
       </div>
 
@@ -338,14 +338,14 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
             
             {/* Add User Profile Form */}
             <div>
-              <h3 className="console-title">Register New Profile</h3>
+              <h3 className="console-title">➕ Add a New Diner Seat</h3>
               <form onSubmit={handleAddPerson} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Full Name</label>
+                  <label className="form-label">Diner Name</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Enter full name"
+                    placeholder="Enter diner full name"
                     value={newPersonName}
                     onChange={(e) => setNewPersonName(e.target.value)}
                     required
@@ -353,7 +353,7 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label">Passcode</label>
+                  <label className="form-label">Seat Entry Passcode</label>
                   <input
                     type="text"
                     className="form-input"
@@ -369,7 +369,7 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
                   style={{ alignSelf: 'flex-start' }}
                   disabled={isAdding}
                 >
-                  {isAdding ? 'Registering...' : 'Register Profile'}
+                  {isAdding ? 'Adding seat...' : '🎉 Add New Seat'}
                 </button>
               </form>
             </div>
@@ -377,7 +377,7 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
             {/* People List Table */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <h3 className="console-title" style={{ margin: 0 }}>Registered User Profiles</h3>
+                <h3 className="console-title" style={{ margin: 0 }}>👥 Seated Diners</h3>
                 {!isAdjusting ? (
                   <button 
                     type="button"
@@ -777,26 +777,26 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
             </div>
 
             {/* Database Reset / Danger Zone */}
-            <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--border-card)', paddingTop: '2rem' }}>
+            <div style={{ marginTop: '2.5rem', borderTop: '3px dashed var(--border-card)', paddingTop: '2rem' }}>
               <h4 style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: '0.95rem',
-                fontWeight: '700',
+                fontSize: '1.25rem',
+                fontWeight: '800',
                 marginBottom: '0.75rem',
                 color: 'var(--accent-rose)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                ⚠️ Danger Zone: Initial State Setup
+                🌋 Volcano Zone: Wipe Diner Table!
               </h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-                Wipe all transaction logs and seed database with a clean zero-sum initial state. Enter a comma-separated list of names to seed as active profiles.
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                Warning: This permanently deletes all menus, bills, and resets everything to zero! Rob will be pleased. Enter a comma-separated list of names to seed the table.
               </p>
               
               <form onSubmit={handleResetDb} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Seed Users (Comma Separated)</label>
+                  <label className="form-label">Seed Diners (Comma Separated)</label>
                   <textarea
                     className="form-input"
                     style={{ 
@@ -820,11 +820,11 @@ export default function AdminPanel({ people, onRefreshData, themeSetting, onUpda
                     alignSelf: 'flex-start',
                     borderColor: 'var(--accent-rose)',
                     color: 'var(--accent-rose)',
-                    background: 'rgba(244, 63, 94, 0.02)'
+                    background: 'var(--bg-secondary)'
                   }}
                   disabled={isResetting || !resetNamesList.trim()}
                 >
-                  {isResetting ? 'Resetting System...' : 'Initialize & Restart State'}
+                  {isResetting ? '🌋 Melting Diner...' : '🌋 MELT SYSTEM & INITIALIZE TABLE'}
                 </button>
               </form>
             </div>

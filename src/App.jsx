@@ -106,20 +106,38 @@ export default function App() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#060a12',
-        color: '#6366f1',
-        fontFamily: 'var(--font-sans)'
+        background: 'var(--bg-primary)',
+        color: 'var(--text-primary)',
+        fontFamily: 'var(--font-sans)',
+        backgroundImage: 'radial-gradient(var(--border-card) 2px, transparent 2px)',
+        backgroundSize: '28px 28px'
       }}>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
         <div style={{
-          width: '32px',
-          height: '32px',
-          border: '2px solid rgba(99, 102, 241, 0.1)',
-          borderTopColor: '#6366f1',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }}></div>
-        <p style={{ marginTop: '1.25rem', fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-secondary)', letterSpacing: '1px' }}>
-          LOADING CONSOLE INFRASTRUCTURE...
+          fontSize: '3.5rem',
+          animation: 'spin 3s linear infinite',
+          display: 'inline-block',
+          marginBottom: '1.5rem',
+          filter: 'drop-shadow(3px 3px 0px var(--border-card))'
+        }}>🍕</div>
+        <p style={{ 
+          fontWeight: '800', 
+          fontSize: '1.25rem', 
+          color: 'var(--text-primary)', 
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase',
+          border: '3px solid var(--border-card)',
+          background: 'var(--accent-amber)',
+          padding: '0.75rem 1.5rem',
+          borderRadius: '16px',
+          boxShadow: '4px 4px 0px var(--border-card)'
+        }}>
+          🧑‍🍳 Baking the diner table... 🧑‍🍳
         </p>
       </div>
     );
@@ -140,47 +158,44 @@ export default function App() {
       <div className="app-container">
         {/* Top Header Navigation */}
         <header className="app-header">
-          <div className="header-brand">
-            <div className="logo-icon"></div>
-            <span className="logo-text">HIT Lunch</span>
-          </div>
+          <div className="header-content-inner">
+            <div className="header-brand">
+              <div className="logo-icon">🍕</div>
+              <span className="logo-text">HIT Lunch Club</span>
+            </div>
 
-          <div className="header-actions">
-            {currentUser && (
-              <>
-                <span className="user-operator-badge">
-                  👤 OP // {currentUser.name}
-                </span>
+            <div className="header-actions">
+              {currentUser && (
+                <>
+                  <span className="user-operator-badge">
+                    👤 diner // {currentUser.name}
+                  </span>
 
-                <button 
-                  className="btn"
-                  style={{
-                    borderColor: activeView === 'admin' ? 'var(--accent-indigo)' : 'var(--border-card)',
-                    background: activeView === 'admin' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                    fontWeight: '700'
-                  }}
-                  onClick={() => setActiveView(activeView === 'admin' ? 'dashboard' : 'admin')}
-                >
-                  {activeView === 'admin' ? '📊 Dashboard' : '🛡️ SysAdmin'}
-                </button>
+                  <button 
+                    className={`btn ${activeView === 'admin' ? 'btn-primary' : ''}`}
+                    onClick={() => setActiveView(activeView === 'admin' ? 'dashboard' : 'admin')}
+                  >
+                    {activeView === 'admin' ? '🍽️ Dining Room' : '⚙️ Manager Office'}
+                  </button>
 
-                <button 
-                  className="btn"
-                  onClick={() => handleUpdateTheme(theme === 'dark' ? 'light' : 'dark')}
-                  title="Toggle color theme"
-                >
-                  {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-                </button>
+                  <button 
+                    className="btn"
+                    onClick={() => handleUpdateTheme(theme === 'dark' ? 'light' : 'dark')}
+                    title="Toggle diner theme"
+                  >
+                    {theme === 'dark' ? '☀️ Day Cafe' : '🌙 Night Tavern'}
+                  </button>
 
-                <button 
-                  className="btn btn-logout"
-                  onClick={() => handleSelectUser(null)}
-                  title="Terminate active session"
-                >
-                  🚪 Log Out
-                </button>
-              </>
-            )}
+                  <button 
+                    className="btn btn-logout"
+                    onClick={() => handleSelectUser(null)}
+                    title="Leave the table"
+                  >
+                    🚪 Leave Table
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -189,11 +204,11 @@ export default function App() {
         {/* Title HUD Bar */}
         <div className="view-title-container">
           <h1 className="view-title">
-            {activeView === 'dashboard' ? 'Balance Vector Console' : 'Sysadmin Configuration'}
+            {activeView === 'dashboard' ? '🍕 The Great Diner Table' : '⚙️ Clubhouse Controls'}
           </h1>
           <div className="last-sync-badge">
-            <span className="pulse-dot success"></span>
-            <span>STATUS: <span className="badge-value">ONLINE</span></span>
+            <span className="pulse-dot"></span>
+            <span>DINER: <span className="badge-value">OPEN</span></span>
           </div>
         </div>
 
