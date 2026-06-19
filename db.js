@@ -215,18 +215,20 @@ export async function deletePerson(id) {
     await firestoreDb.runTransaction(async (transaction) => {
       const targetRef = firestoreDb.collection('people').doc(id);
 
+      // Perform all gets/reads first to obey Firestore transaction rules (no gets after updates/deletes)
+      const otherActiveRefs = activeOthers.map(p => firestoreDb.collection('people').doc(p.id));
+      const otherActiveDocs = otherActiveRefs.length > 0 
+        ? await Promise.all(otherActiveRefs.map(ref => transaction.get(ref))) 
+        : [];
+
       // Redistribute balance if they have a non-zero score and others exist
-      if (activeOthers.length > 0 && scoreToDelete !== 0) {
-        const share = parseFloat((scoreToDelete / activeOthers.length).toFixed(2));
+      if (otherActiveDocs.length > 0 && scoreToDelete !== 0) {
+        const share = parseFloat((scoreToDelete / otherActiveDocs.length).toFixed(2));
         let totalDistributed = 0;
 
-        for (let idx = 0; idx < activeOthers.length; idx++) {
-          const person = activeOthers[idx];
-          const personRef = firestoreDb.collection('people').doc(person.id);
-          const personDoc = await transaction.get(personRef);
-          
+        otherActiveDocs.forEach((personDoc, idx) => {
           let finalShare = share;
-          if (idx === activeOthers.length - 1) {
+          if (idx === otherActiveDocs.length - 1) {
             finalShare = parseFloat((scoreToDelete - totalDistributed).toFixed(2));
           } else {
             totalDistributed += share;
@@ -234,9 +236,9 @@ export async function deletePerson(id) {
 
           if (personDoc.exists) {
             const currentScore = personDoc.data().score || 0;
-            transaction.update(personRef, { score: parseFloat((currentScore + finalShare).toFixed(2)) });
+            transaction.update(personDoc.ref, { score: parseFloat((currentScore + finalShare).toFixed(2)) });
           }
-        }
+        });
       }
 
       // Delete target person document
