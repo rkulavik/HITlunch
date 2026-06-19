@@ -192,45 +192,51 @@ export async function updatePerson(id, updates) {
  */
 export async function deletePerson(id) {
   if (dbType === 'firestore') {
+    // 1. Get current list of people to locate the score and active others outside the transaction
+    const snapshot = await firestoreDb.collection('people').orderBy('name').get();
+    const people = [];
+    snapshot.forEach(doc => {
+      people.push({ id: doc.id, ...doc.data() });
+    });
+
+    const targetPerson = people.find(p => p.id === id);
+    if (!targetPerson) {
+      throw new Error('Person profile not found');
+    }
+
+    const scoreToDelete = targetPerson.score || 0;
+    const activeOthers = people.filter(p => p.id !== id && p.isActive);
+
+    if (activeOthers.length === 0 && scoreToDelete !== 0) {
+      throw new Error('Cannot delete profile with non-zero balance when no other active profiles exist.');
+    }
+
+    // 2. Run transaction to atomically fetch other active documents and apply balance changes
     await firestoreDb.runTransaction(async (transaction) => {
       const targetRef = firestoreDb.collection('people').doc(id);
-      const targetDoc = await transaction.get(targetRef);
-      if (!targetDoc.exists) {
-        throw new Error('Person profile not found');
-      }
-
-      const scoreToDelete = targetDoc.data().score || 0;
-
-      // Fetch all other active users
-      const allDocsSnapshot = await firestoreDb.collection('people').get();
-      const otherActiveDocs = [];
-      allDocsSnapshot.forEach(doc => {
-        if (doc.id !== id && doc.data().isActive) {
-          otherActiveDocs.push(doc);
-        }
-      });
-
-      if (otherActiveDocs.length === 0 && scoreToDelete !== 0) {
-        throw new Error('Cannot delete profile with non-zero balance when no other active profiles exist.');
-      }
 
       // Redistribute balance if they have a non-zero score and others exist
-      if (otherActiveDocs.length > 0 && scoreToDelete !== 0) {
-        const share = parseFloat((scoreToDelete / otherActiveDocs.length).toFixed(2));
+      if (activeOthers.length > 0 && scoreToDelete !== 0) {
+        const share = parseFloat((scoreToDelete / activeOthers.length).toFixed(2));
         let totalDistributed = 0;
 
-        otherActiveDocs.forEach((doc, idx) => {
+        for (let idx = 0; idx < activeOthers.length; idx++) {
+          const person = activeOthers[idx];
+          const personRef = firestoreDb.collection('people').doc(person.id);
+          const personDoc = await transaction.get(personRef);
+          
           let finalShare = share;
-          if (idx === otherActiveDocs.length - 1) {
-            // Remainder adjustment for exact balance match
+          if (idx === activeOthers.length - 1) {
             finalShare = parseFloat((scoreToDelete - totalDistributed).toFixed(2));
           } else {
             totalDistributed += share;
           }
 
-          const currentScore = doc.data().score || 0;
-          transaction.update(doc.ref, { score: parseFloat((currentScore + finalShare).toFixed(2)) });
-        });
+          if (personDoc.exists) {
+            const currentScore = personDoc.data().score || 0;
+            transaction.update(personRef, { score: parseFloat((currentScore + finalShare).toFixed(2)) });
+          }
+        }
       }
 
       // Delete target person document
